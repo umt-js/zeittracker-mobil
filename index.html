@@ -58,6 +58,8 @@ main{padding:0 16px;max-width:560px;margin:0 auto}
 .sheet.open{display:flex}
 #pickSheet{z-index:11}   /* Projektwahl liegt über dem Bearbeiten-Blatt */
 #aufSheet{z-index:12}    /* Auftragswahl folgt auf die Projektwahl */
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:1px;flex:none}
+.grp .dot{width:9px;height:9px}
 .item .tag{display:inline-block;font-size:12px;padding:0 6px;border-radius:8px;background:var(--acc2);color:var(--acc);margin-left:4px}
 .sheet .top{display:flex;align-items:center;padding:8px 10px;gap:6px;max-width:560px;width:100%;margin:0 auto}
 .sheet .top b{flex:1;text-align:center;font-size:17px}
@@ -197,6 +199,9 @@ let PROJ = new Map();
 function indexProjects() { PROJ = new Map((st.auftraege?.projekte || []).map(p => [p.nr, p])); }
 indexProjects();
 const pname = nr => (PROJ.get(nr)?.name) || '';
+// Favoriten (am PC gepflegt): Farbe der Gruppe, z. B. gleicher Auftraggeber
+const favColor = nr => { const c = PROJ.get(nr)?.farbe; return PROJ.get(nr)?.favorit && /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : ''; };
+const dotHtml = nr => favColor(nr) ? `<span class="dot" style="background:${favColor(nr)}"></span>` : '';
 // Auswahl = {projekt, auftrag, pos}; leerer Auftrag = "wie üblich" (entscheidet die Auswertung am PC)
 const aufList = nr => [].concat(PROJ.get(nr)?.auftraege || []);
 const hasChoice = nr => { const a = aufList(nr); return a.length > 1 || (a.length === 1 && Object.keys(a[0].pos || {}).length > 1); };
@@ -289,7 +294,7 @@ async function checkNearby() {
   const [nr, d] = near[0];
   const sel = { projekt: nr, ...((st.wahl || {})[nr] || {}) };   // wie beim letzten Mal
   $('#suggest').innerHTML = `<div class="card suggest"><div class="small muted">📍 In der Nähe (${Math.round(d)} m)</div>
-    <div style="margin-top:4px"><span class="nr">${esc(nr)}</span> <span class="small muted">${esc(selLabel(sel))}</span></div><div class="small muted">${esc(selText(sel))}</div>
+    <div style="margin-top:4px">${dotHtml(nr)}<span class="nr">${esc(nr)}</span> <span class="small muted">${esc(selLabel(sel))}</span></div><div class="small muted">${esc(selText(sel))}</div>
     <div class="row"><button class="btn" id="sugGo">${st.laufend ? 'Wechseln' : 'Starten'}</button><button class="btn sec" id="sugOther">Anderer Auftrag</button><button class="btn sec" id="sugNo">Nein</button></div></div>`;
   $('#sugGo').onclick = () => { $('#suggest').innerHTML = ''; start(sel); };
   $('#sugOther').onclick = () => { $('#suggest').innerHTML = ''; chooseAuftrag(nr, start, true); };
@@ -326,7 +331,7 @@ function renderRun() {
   }
   const s = new Date(r.start);
   el.innerHTML = `<div class="small muted">Läuft</div>
-    <div style="margin-top:2px"><span class="nr" style="font-size:19px">${esc(r.projekt)}</span> <span class="muted">${esc(selLabel(r))}</span></div><div class="name">${esc(selText(r))}</div>
+    <div style="margin-top:2px">${dotHtml(r.projekt)}<span class="nr" style="font-size:19px">${esc(r.projekt)}</span> <span class="muted">${esc(selLabel(r))}</span></div><div class="name">${esc(selText(r))}</div>
     ${hasChoice(r.projekt) ? `<button class="link" id="aufBtn" style="padding-top:2px">${r.auftrag ? 'Auftrag ändern' : 'Auftrag wählen (sonst wie üblich)'}</button>` : ''}
     <div class="clock" id="clock"></div>
     <div class="since">seit <input type="time" id="since" value="${hmOf(s)}"> ${dstr(s) !== dstr(new Date()) ? '(' + niceDay(dstr(s)) + ')' : ''}</div>
@@ -356,7 +361,7 @@ function renderDay() {
   if (!list.length) h += `<div class="empty">Keine Einträge${isToday && st.laufend ? ' (laufende Zeit wird beim Stopp eingetragen)' : ''}</div>`;
   for (const e of list) {
     h += `<div class="entry" data-id="${e.id}"><div class="t">${e.von}–${e.bis === '24:00' ? '24:00' : e.bis}</div>
-      <div class="p"><div><span class="nr">${esc(e.projekt)}</span> <span class="small muted">${esc(selLabel(e))}</span></div><div class="small muted">${esc(e.notiz || selText(e))}</div></div>
+      <div class="p"><div>${dotHtml(e.projekt)}<span class="nr">${esc(e.projekt)}</span> <span class="small muted">${esc(selLabel(e))}</span></div><div class="small muted">${esc(e.notiz || selText(e))}</div></div>
       <div class="d">${dur(mins(e.bis) - mins(e.von))}</div></div>`;
   }
   if (list.length) h += `<div class="total"><span>Summe</span><span>${dur(total)} h</span></div>`;
@@ -387,7 +392,7 @@ function itemHtml(nr, extra) {
   const p = PROJ.get(nr);
   const na = aufList(nr).length;
   const aufInfo = na > 1 ? na + ' Aufträge' : p?.auftrag && p.auftrag !== nr + '-01' ? p.auftrag : '';
-  return `<div class="item" data-nr="${esc(nr)}"><div><span class="nr">${esc(nr)}</span>${aufInfo ? ` <span class="small muted">${esc(aufInfo)}</span>` : ''}${extra ? ` <span class="small muted">${extra}</span>` : ''}</div>${p?.name ? `<div class="n2">${esc(p.name)}</div>` : ''}</div>`;
+  return `<div class="item" data-nr="${esc(nr)}"><div>${dotHtml(nr)}<span class="nr">${esc(nr)}</span>${aufInfo ? ` <span class="small muted">${esc(aufInfo)}</span>` : ''}${extra ? ` <span class="small muted">${extra}</span>` : ''}</div>${p?.name ? `<div class="n2">${esc(p.name)}</div>` : ''}</div>`;
 }
 function renderPick() {
   const q = norm($('#q').value.trim()), words = q.split(/\s+/).filter(Boolean);
@@ -396,15 +401,25 @@ function renderPick() {
   if (!words.length) {
     const near = nearby(lastPos);
     if (near.length) h += `<div class="grp">📍 In der Nähe</div><div class="list">${near.slice(0, 5).map(([nr, d]) => itemHtml(nr, Math.round(d) + ' m')).join('')}</div>`;
-    // zuletzt: in der App genutzt, dann vom PC als „zuletzt“ markiert
+    // Favoriten vom PC: nach Rang, je Gruppe eine Zwischenüberschrift in der Gruppenfarbe
+    const favs = all.filter(p => p.favorit).sort((a, b) => (a.favRang ?? 1e9) - (b.favRang ?? 1e9));
+    let lastG = null;
+    for (const p of favs) {
+      const g = p.gruppe || '';
+      if (g !== lastG) { h += (lastG !== null ? '</div>' : '') + `<div class="grp">${dotHtml(p.nr)}★ ${esc(g || 'Favoriten')}</div><div class="list">`; lastG = g; }
+      h += itemHtml(p.nr);
+    }
+    if (lastG !== null) h += '</div>';
+    const favSet = new Set(favs.map(p => p.nr));
+    // zuletzt: in der App genutzt, dann vom PC als „zuletzt“ markiert (Favoriten stehen schon oben)
     const used = Object.entries(st.genutzt).sort((a, b) => b[1].localeCompare(a[1])).map(([nr]) => nr);
-    const rec = [...new Set([...used, ...all.filter(p => p.zuletzt && !p.allgemein).map(p => p.nr)])].slice(0, 25);
+    const rec = [...new Set([...used, ...all.filter(p => p.zuletzt && !p.allgemein).map(p => p.nr)])].filter(nr => !favSet.has(nr)).slice(0, 25);
     if (rec.length) h += `<div class="grp">Zuletzt</div><div class="list">${rec.map(nr => itemHtml(nr)).join('')}</div>`;
     const gen = all.filter(p => p.allgemein);
     if (gen.length) h += `<div class="grp">Allgemein</div><div class="list">${gen.map(p => itemHtml(p.nr)).join('')}</div>`;
     if (!all.length) h += `<div class="card small muted">Noch keine Auftragsliste geladen – Projektnummer oben eintippen oder im Menü die Liste laden.</div>`;
   } else {
-    const hits = all.filter(p => { const s = norm(p.nr + ' ' + p.name + ' ' + p.auftrag); return words.every(w => s.includes(w)); });
+    const hits = all.filter(p => { const s = norm(p.nr + ' ' + p.name + ' ' + p.auftrag + ' ' + (p.gruppe || '')); return words.every(w => s.includes(w)); });
     const raw = $('#q').value.trim();
     const exact = all.some(p => norm(p.nr) === q);
     h += `<div class="list">${hits.slice(0, 80).map(p => itemHtml(p.nr)).join('')}</div>`;
