@@ -142,7 +142,8 @@ main{padding:0 16px;max-width:560px;margin:0 auto}
   <div class="body menu">
     <div class="grp">Auftragsliste</div>
     <div class="list">
-      <div class="item" id="loadList"><span class="ic">📂</span><div><div>Auftragsliste laden</div><div class="n2" id="listInfo"></div></div></div>
+      <div class="item" id="loadList"><span class="ic">📂</span><div style="min-width:0"><div>Auftragsliste laden</div><div class="n2" id="listInfo" style="white-space:normal"></div></div></div>
+      <div class="item" id="delPersonal"><span class="ic">🗑</span><div>Persönliche Liste entfernen</div></div>
     </div>
     <div class="grp">Übertragung zum PC</div>
     <div class="list">
@@ -152,7 +153,9 @@ main{padding:0 16px;max-width:560px;margin:0 auto}
     <div class="list" id="places"></div>
     <div class="grp">So funktioniert's</div>
     <div class="card small" style="margin-top:0">
-      <p style="margin-top:0"><b>Auftragsliste:</b> Der ZeitTracker am PC legt sie in OneDrive ab: <i>OneDrive › ZeitTracker-mobil › auftraege.json</i>. „Auftragsliste laden“ und diese Datei wählen – nach neuen Projekten wiederholen.</p>
+      <p style="margin-top:0"><b>Auftragslisten:</b> „Auftragsliste laden“ und eine Datei <i>auftraege.json</i> wählen – die App erkennt selbst, welche es ist, und behält die jeweils andere.</p>
+      <p><b>Gemeinsam</b> (für alle): liegt im gemeinsamen ZeitTracker-Ordner, den der Admin nennt. Nach jedem neuen Projektexport neu laden – die App erinnert nach 3 Wochen.</p>
+      <p><b>Persönlich</b> (optional, wer den ZeitTracker am PC nutzt): <i>OneDrive › ZeitTracker-mobil › auftraege.json</i> – bringt Favoriten, zuletzt genutzte und eigene Aufträge dazu.</p>
       <p><b>Senden:</b> „In Dateien sichern“ wählen, dann denselben Ordner <i>ZeitTracker-mobil</i>. Gibt es die Datei schon: <b>Ersetzen</b>. Die Auswertung am PC zeigt die Zeiten dann mit 📱.</p>
       <p style="margin-bottom:0"><b>Orte:</b> Einmal auf der Baustelle „Standort merken“ – beim nächsten Öffnen der App dort wird das Projekt vorgeschlagen. Standorte bleiben nur auf diesem iPhone.</p>
     </div>
@@ -168,8 +171,11 @@ main{padding:0 16px;max-width:560px;margin:0 auto}
 // ------------------------------------------------------------ Speicher (nur auf diesem Gerät)
 const KEY = 'ztm:v1';
 const rid = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); };
-const blank = () => ({ geraet: rid(4), auftraege: null, eintraege: [], laufend: null, orte: {}, genutzt: {}, gesendet: null });
+// listen.geteilt = gemeinsame Liste für alle (quelle 'geteilt'), listen.persoenlich = Liste des eigenen ZeitTrackers
+const blank = () => ({ geraet: rid(4), listen: { geteilt: null, persoenlich: null }, eintraege: [], laufend: null, orte: {}, genutzt: {}, gesendet: null });
 let st = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(blank(), s); } catch (e) {} return blank(); })();
+// ältere Fassung: eine einzige Liste in st.auftraege -> je nach Herkunft übernehmen
+if (st.auftraege) { st.listen[st.auftraege.quelle === 'geteilt' ? 'geteilt' : 'persoenlich'] = st.auftraege; delete st.auftraege; }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(st)); }
   catch (e) { alert('Speichern auf dem Gerät fehlgeschlagen – bitte die Zeiten jetzt senden.'); }
@@ -195,8 +201,30 @@ function niceDay(day) {
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); }
 const norm = s => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
 
-let PROJ = new Map();
-function indexProjects() { PROJ = new Map((st.auftraege?.projekte || []).map(p => [p.nr, p])); }
+// Anzeige = beide Listen zusammengeführt (Basis gemeinsam, persönliche Angaben gehen vor)
+const PERS_KEYS = ['auftrag', 'pos', 'zuletzt', 'favorit', 'farbe', 'gruppe', 'favRang'];
+function mergeLists(g, p) {
+  if (!g || !p) return g || p || null;
+  const map = new Map(g.projekte.map(x => [x.nr, { ...x, auftraege: [].concat(x.auftraege || []).map(a => ({ ...a, pos: { ...(a.pos || {}) } })) }]));
+  for (const x of p.projekte) {
+    const b = map.get(x.nr);
+    if (!b) { map.set(x.nr, { ...x, eigenesTeam: !!x.allgemein }); continue; }   // nur persönlich (eigene/neue Projekte)
+    for (const k of PERS_KEYS) if (x[k] !== undefined && x[k] !== '') b[k] = x[k];
+    if (!b.name && x.name) b.name = x.name;
+    if (x.allgemein) b.eigenesTeam = true;
+    for (const a of [].concat(x.auftraege || [])) {
+      const have = b.auftraege.find(y => y.nr === a.nr);
+      if (!have) b.auftraege.push(a);
+      else for (const [k, v] of Object.entries(a.pos || {})) if (!(k in have.pos)) have.pos[k] = v;
+    }
+  }
+  return { typ: 'zeittracker-auftraege', stand: g.stand, user: p.user || '', zusammen: true, projekte: [...map.values()] };
+}
+let AUF = null, PROJ = new Map();
+function indexProjects() {
+  AUF = mergeLists(st.listen.geteilt, st.listen.persoenlich);
+  PROJ = new Map((AUF?.projekte || []).map(p => [p.nr, p]));
+}
 indexProjects();
 const pname = nr => (PROJ.get(nr)?.name) || '';
 // Favoriten (am PC gepflegt): Farbe der Gruppe, z. B. gleicher Auftraggeber
@@ -310,10 +338,12 @@ function renderHints() {
   const h = [];
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   if (ios && !navigator.standalone) h.push(`<div class="hint"><b>Zum Home-Bildschirm hinzufügen</b>In Safari unten auf <i>Teilen</i> ⬆︎ und „Zum Home-Bildschirm“ tippen. Dann startet die App wie eine normale App und die Daten bleiben dauerhaft gespeichert.</div>`);
-  if (!st.auftraege) h.push(`<div class="hint"><b>Erst die Auftragsliste laden</b>Der ZeitTracker am PC legt sie in OneDrive ab (Ordner <i>ZeitTracker-mobil</i>, Datei <i>auftraege.json</i>).<div class="row"><button class="btn" id="hintLoad">Auftragsliste laden</button></div></div>`);
+  if (!AUF) h.push(`<div class="hint"><b>Erst die Auftragsliste laden</b>Die gemeinsame Auftragsliste <i>auftraege.json</i> liegt im gemeinsamen ZeitTracker-Ordner (den Ordner nennt der Admin).
+    Wer den ZeitTracker am PC nutzt, kann zusätzlich die persönliche Liste aus <i>OneDrive › ZeitTracker-mobil</i> laden (Favoriten, eigene Aufträge).<div class="row"><button class="btn" id="hintLoad">Auftragsliste laden</button></div></div>`);
   else {
-    const age = (Date.now() - new Date(st.auftraege.stand)) / 864e5;
-    if (!st.auftraege.projekte.some(p => p.auftraege)) h.push(`<div class="hint"><b>Auftragsliste bitte neu laden</b>Die neue Fassung enthält die einzelnen Aufträge und Positionen je Projekt (Menü → Auftragsliste laden).</div>`);
+    // Erinnerung richtet sich nach der gemeinsamen Liste (sonst nach der persönlichen)
+    const age = (Date.now() - new Date((st.listen.geteilt || st.listen.persoenlich).stand)) / 864e5;
+    if (!AUF.projekte.some(p => p.auftraege)) h.push(`<div class="hint"><b>Auftragsliste bitte neu laden</b>Die neue Fassung enthält die einzelnen Aufträge und Positionen je Projekt (Menü → Auftragsliste laden).</div>`);
     else if (age > 21) h.push(`<div class="hint"><b>Auftragsliste ist ${Math.floor(age)} Tage alt</b>Neue Projekte fehlen evtl. – im Menü neu laden.</div>`);
   }
   $('#hints').innerHTML = h.join('');
@@ -396,7 +426,7 @@ function itemHtml(nr, extra) {
 }
 function renderPick() {
   const q = norm($('#q').value.trim()), words = q.split(/\s+/).filter(Boolean);
-  const all = st.auftraege?.projekte || [];
+  const all = AUF?.projekte || [];
   let h = '';
   if (!words.length) {
     const near = nearby(lastPos);
@@ -415,7 +445,8 @@ function renderPick() {
     const used = Object.entries(st.genutzt).sort((a, b) => b[1].localeCompare(a[1])).map(([nr]) => nr);
     const rec = [...new Set([...used, ...all.filter(p => p.zuletzt && !p.allgemein).map(p => p.nr)])].filter(nr => !favSet.has(nr)).slice(0, 25);
     if (rec.length) h += `<div class="grp">Zuletzt</div><div class="list">${rec.map(nr => itemHtml(nr)).join('')}</div>`;
-    const gen = all.filter(p => p.allgemein);
+    // Allgemein/Akquise: mit persönlicher Liste nur das eigene Team (andere Teams über die Suche)
+    const gen = all.filter(p => p.allgemein && (!st.listen.persoenlich || !AUF.zusammen || p.eigenesTeam));
     if (gen.length) h += `<div class="grp">Allgemein</div><div class="list">${gen.map(p => itemHtml(p.nr)).join('')}</div>`;
     if (!all.length) h += `<div class="card small muted">Noch keine Auftragsliste geladen – Projektnummer oben eintippen oder im Menü die Liste laden.</div>`;
   } else {
@@ -520,15 +551,20 @@ $('#fileIn').onchange = async ev => {
   try {
     const d = JSON.parse((await f.text()).replace(/^﻿/, ''));
     if (d.typ !== 'zeittracker-auftraege' || !Array.isArray(d.projekte)) throw new Error('falsche Datei');
-    st.auftraege = d; indexProjects(); save(); render(); renderMenu();
-    toast(d.projekte.length + ' Projekte geladen');
-  } catch (e) { alert('Das ist keine Auftragsliste des ZeitTrackers.\nBitte „auftraege.json“ aus OneDrive › ZeitTracker-mobil wählen.'); }
+    const art = d.quelle === 'geteilt' ? 'geteilt' : 'persoenlich';
+    st.listen[art] = d; indexProjects(); save(); render(); renderMenu();
+    toast((art === 'geteilt' ? 'Gemeinsame' : 'Persönliche') + ' Liste geladen: ' + d.projekte.length + ' Projekte');
+  } catch (e) { alert('Das ist keine Auftragsliste des ZeitTrackers.\nBitte eine Datei „auftraege.json“ wählen (gemeinsamer ZeitTracker-Ordner oder OneDrive › ZeitTracker-mobil).'); }
+};
+$('#delPersonal').onclick = () => {
+  if (!confirm('Persönliche Auftragsliste entfernen? Favoriten und eigene Aufträge verschwinden dann aus der Auswahl. Erfasste Zeiten bleiben.')) return;
+  st.listen.persoenlich = null; indexProjects(); save(); render(); renderMenu();
 };
 
 // ------------------------------------------------------------ Senden (Datei nach OneDrive)
 async function send() {
   const since = dstr(new Date(Date.now() - 400 * 864e5));
-  const data = { typ: 'zeittracker-mobil', version: 1, geraet: st.geraet, user: st.auftraege?.user || '', erstellt: iso(),
+  const data = { typ: 'zeittracker-mobil', version: 1, geraet: st.geraet, user: AUF?.user || '', erstellt: iso(),
                  eintraege: st.eintraege.filter(e => e.tag >= since) };
   const name = 'zeiten-iphone-' + st.geraet + '.json';
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -550,7 +586,12 @@ $('#menuSend').onclick = () => { closeSheet('#menuSheet'); send(); };
 // ------------------------------------------------------------ Menü
 function fmtStamp(s) { const d = new Date(s); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + hmOf(d); }
 function renderMenu() {
-  $('#listInfo').textContent = st.auftraege ? `${st.auftraege.projekte.length} Projekte · Stand ${fmtStamp(st.auftraege.stand)}` : 'noch nicht geladen';
+  const g = st.listen.geteilt, p = st.listen.persoenlich;
+  const exp = g && /(\d{4})(\d{2})(\d{2})/.exec(g.export || '');
+  $('#listInfo').innerHTML = !g && !p ? 'noch nicht geladen'
+    : `Gemeinsam: ${g ? `${g.projekte.length} Projekte · Stand ${esc(fmtStamp(g.stand))}${exp ? ` · Export ${exp[3]}.${exp[2]}.${exp[1]}` : ''}` : 'nicht geladen'}<br>` +
+      `Persönlich: ${p ? `Stand ${esc(fmtStamp(p.stand))}${p.user ? ' · ' + esc(p.user) : ''}` : 'nicht geladen'}`;
+  $('#delPersonal').style.display = p ? '' : 'none';
   const n = unsent();
   $('#sendInfo').textContent = (st.gesendet ? 'zuletzt ' + fmtStamp(st.gesendet) : 'noch nie gesendet') + (n ? ` · ${n} neu/geändert` : '');
   const pl = Object.entries(st.orte).filter(([, l]) => l.length);
@@ -572,7 +613,9 @@ document.addEventListener('visibilitychange', () => {
 // am PC (vom ZeitTracker ausgeliefert): Auftragsliste direkt holen
 if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   fetch('auftraege.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
-    if (d && d.typ === 'zeittracker-auftraege' && (!st.auftraege || d.stand > st.auftraege.stand)) { st.auftraege = d; indexProjects(); save(); render(); }
+    // das ist die persönliche Liste aus dem OneDrive-Ordner
+    const art = d && d.quelle === 'geteilt' ? 'geteilt' : 'persoenlich', cur = st.listen[art];
+    if (d && d.typ === 'zeittracker-auftraege' && (!cur || d.stand > cur.stand)) { st.listen[art] = d; indexProjects(); save(); render(); }
   }).catch(() => {});
 }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

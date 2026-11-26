@@ -1,6 +1,6 @@
 // Offline-Fähigkeit: App-Dateien zwischenspeichern, im Hintergrund aktualisieren.
 // Zeiten liegen nicht hier, sondern im Speicher der App (localStorage).
-const CACHE = 'zt-mobil-v3';
+const CACHE = 'zt-mobil-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
