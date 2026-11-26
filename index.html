@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ZeitTracker">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>ZeitTracker mobil</title>
+<style>
+:root{--bg:#f2f3f5;--card:#fff;--fg:#1c1e21;--muted:#6b7280;--line:#e3e5e8;--acc:#1f5f8b;--acc2:#e6eef6;--warn:#fff4cc;--red:#c43d4b;--sheet:#f2f3f5}
+@media (prefers-color-scheme:dark){:root{--bg:#111315;--card:#1c1f23;--fg:#e8eaed;--muted:#9aa0a6;--line:#2c3036;--acc:#5aa2d8;--acc2:#1b2a36;--warn:#3a3214;--red:#ef6b77;--sheet:#111315}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(84px + env(safe-area-inset-bottom))}
+button,input,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:4px;padding:10px 16px 0;max-width:560px;margin:0 auto}
+header h1{font-size:24px;margin:0;flex:1;font-weight:700}
+.ib{border:0;background:none;color:var(--acc);font-size:16px;padding:8px 6px;border-radius:10px;cursor:pointer}
+main{padding:0 16px;max-width:560px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin:12px 0}
+.muted{color:var(--muted)} .small{font-size:13px}
+.nr{font-weight:600}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:600;background:var(--acc);color:#fff;cursor:pointer}
+.btn.sec{background:var(--acc2);color:var(--acc)}
+.btn.red{background:var(--red);color:#fff}
+.btn:disabled{opacity:.45}
+.row{display:flex;gap:8px;margin-top:10px} .row>*{flex:1}
+.link{border:0;background:none;color:var(--acc);font-size:15px;padding:8px 0 0;cursor:pointer}
+.run .name{color:var(--muted);font-size:14px;margin-top:2px}
+.run .clock{font-size:44px;font-variant-numeric:tabular-nums;font-weight:600;margin:6px 0 0;letter-spacing:-.5px}
+.run .since{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+.run .since input{border:0;background:var(--acc2);color:var(--acc);border-radius:8px;padding:2px 6px;font-size:14px}
+.hint{background:var(--warn);border-radius:12px;padding:12px 14px;margin:12px 0;font-size:14px}
+.hint b{display:block;margin-bottom:4px}
+.suggest{border:2px solid var(--acc)}
+.dayhead{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dayhead b{flex:1;text-align:center}
+.entry{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.entry:first-of-type{border-top:0}
+.entry .t{font-variant-numeric:tabular-nums;white-space:nowrap;min-width:96px}
+.entry .p{flex:1;min-width:0}
+.entry .p div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .d{font-variant-numeric:tabular-nums;color:var(--muted)}
+.total{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;margin-top:4px;font-weight:600}
+.empty{color:var(--muted);padding:6px 0 2px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{display:flex;gap:10px;max-width:560px;margin:0 auto}
+.bar .btn{padding:12px;font-size:16px}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:#fff;color:var(--acc);font-size:13px;line-height:20px}
+/* Blätter (Vollbild-Dialoge) */
+.sheet{position:fixed;inset:0;background:var(--sheet);z-index:10;display:none;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.sheet.open{display:flex}
+#pickSheet{z-index:11}   /* Projektwahl liegt über dem Bearbeiten-Blatt */
+#aufSheet{z-index:12}    /* Auftragswahl folgt auf die Projektwahl */
+.item .tag{display:inline-block;font-size:12px;padding:0 6px;border-radius:8px;background:var(--acc2);color:var(--acc);margin-left:4px}
+.sheet .top{display:flex;align-items:center;padding:8px 10px;gap:6px;max-width:560px;width:100%;margin:0 auto}
+.sheet .top b{flex:1;text-align:center;font-size:17px}
+.sheet .top .ib{min-width:84px}
+.sheet .top .ib.r{text-align:right;font-weight:600}
+.sheet .body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(24px + env(safe-area-inset-bottom));max-width:560px;width:100%;margin:0 auto}
+.search{width:100%;border:0;border-radius:10px;padding:10px 12px;background:var(--card);font-size:17px;margin:4px 0 8px}
+.grp{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 4px 6px}
+.list{background:var(--card);border-radius:12px;overflow:hidden}
+.item{padding:11px 14px;border-top:1px solid var(--line);cursor:pointer}
+.item:first-child{border-top:0}
+.item .n2{color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.form{background:var(--card);border-radius:12px;overflow:hidden;margin-top:12px}
+.form label{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-height:48px}
+.form label:first-child{border-top:0}
+.form label span{width:76px;color:var(--muted);flex:none}
+.form input,.form textarea{flex:1;border:0;background:none;font-size:17px;min-width:0;text-align:right}
+.form textarea{text-align:left;resize:none;height:64px}
+.form .pick{flex:1;text-align:right;color:var(--acc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.err{color:var(--red);font-size:14px;margin:8px 4px 0;min-height:18px}
+.menu .item{display:flex;gap:10px;align-items:center}
+.menu .item .ic{width:24px;text-align:center}
+.place{display:flex;align-items:center;gap:8px}
+.place div{flex:1;min-width:0}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:15px;display:none;z-index:20;max-width:90vw;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>ZeitTracker</h1>
+  <button class="ib" id="menuBtn" aria-label="Menü">⋯ Menü</button>
+</header>
+<main>
+  <div id="hints"></div>
+  <div id="suggest"></div>
+  <div class="card run" id="run"></div>
+  <div class="card" id="day"></div>
+</main>
+<div class="bar"><div class="in">
+  <button class="btn sec" id="addBtn">＋ Nachtragen</button>
+  <button class="btn" id="sendBtn">Senden</button>
+</div></div>
+
+<!-- Projekt wählen -->
+<div class="sheet" id="pickSheet">
+  <div class="top"><button class="ib" data-close>Abbrechen</button><b>Projekt wählen</b><span class="ib"></span></div>
+  <div class="body">
+    <input class="search" id="q" type="search" placeholder="Nummer, Ort oder Stichwort" autocomplete="off" autocorrect="off" spellcheck="false">
+    <div id="pickList"></div>
+  </div>
+</div>
+
+<!-- Auftrag / Position wählen -->
+<div class="sheet" id="aufSheet">
+  <div class="top"><button class="ib" data-close>Abbrechen</button><b id="aufTitle">Auftrag wählen</b><span class="ib"></span></div>
+  <div class="body"><div id="aufList"></div></div>
+</div>
+
+<!-- Eintrag bearbeiten -->
+<div class="sheet" id="editSheet">
+  <div class="top"><button class="ib" data-close>Abbrechen</button><b id="editTitle">Eintrag</b><button class="ib r" id="editSave">Sichern</button></div>
+  <div class="body">
+    <div class="form">
+      <label><span>Projekt</span><div class="pick" id="editProj">wählen …</div></label>
+      <label><span>Datum</span><input type="date" id="editDay"></label>
+      <label><span>Von</span><input type="time" id="editFrom"></label>
+      <label><span>Bis</span><input type="time" id="editTo"></label>
+      <label><span>Notiz</span><textarea id="editNote" placeholder="optional, z. B. Baustellenbegehung"></textarea></label>
+    </div>
+    <button class="link" id="editAuf" style="margin-left:4px"></button>
+    <div class="err" id="editErr"></div>
+    <button class="btn sec" id="editPlace" style="margin-top:8px">📍 Standort für dieses Projekt merken</button>
+    <button class="btn red" id="editDel" style="margin-top:10px">Eintrag löschen</button>
+  </div>
+</div>
+
+<!-- Menü -->
+<div class="sheet" id="menuSheet">
+  <div class="top"><span class="ib"></span><b>Menü</b><button class="ib r" data-close>Fertig</button></div>
+  <div class="body menu">
+    <div class="grp">Auftragsliste</div>
+    <div class="list">
+      <div class="item" id="loadList"><span class="ic">📂</span><div><div>Auftragsliste laden</div><div class="n2" id="listInfo"></div></div></div>
+    </div>
+    <div class="grp">Übertragung zum PC</div>
+    <div class="list">
+      <div class="item" id="menuSend"><span class="ic">📤</span><div><div>Zeiten senden</div><div class="n2" id="sendInfo"></div></div></div>
+    </div>
+    <div class="grp">Gemerkte Orte</div>
+    <div class="list" id="places"></div>
+    <div class="grp">So funktioniert's</div>
+    <div class="card small" style="margin-top:0">
+      <p style="margin-top:0"><b>Auftragsliste:</b> Der ZeitTracker am PC legt sie in OneDrive ab: <i>OneDrive › ZeitTracker-mobil › auftraege.json</i>. „Auftragsliste laden“ und diese Datei wählen – nach neuen Projekten wiederholen.</p>
+      <p><b>Senden:</b> „In Dateien sichern“ wählen, dann denselben Ordner <i>ZeitTracker-mobil</i>. Gibt es die Datei schon: <b>Ersetzen</b>. Die Auswertung am PC zeigt die Zeiten dann mit 📱.</p>
+      <p style="margin-bottom:0"><b>Orte:</b> Einmal auf der Baustelle „Standort merken“ – beim nächsten Öffnen der App dort wird das Projekt vorgeschlagen. Standorte bleiben nur auf diesem iPhone.</p>
+    </div>
+    <p class="small muted" id="devInfo"></p>
+  </div>
+</div>
+
+<input type="file" id="fileIn" hidden>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ------------------------------------------------------------ Speicher (nur auf diesem Gerät)
+const KEY = 'ztm:v1';
+const rid = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); };
+const blank = () => ({ geraet: rid(4), auftraege: null, eintraege: [], laufend: null, orte: {}, genutzt: {}, gesendet: null });
+let st = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(blank(), s); } catch (e) {} return blank(); })();
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(st)); }
+  catch (e) { alert('Speichern auf dem Gerät fehlgeschlagen – bitte die Zeiten jetzt senden.'); }
+}
+save();
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+// ------------------------------------------------------------ Hilfen
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, '0');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const dstr = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const hmOf = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const dur = m => Math.floor(m / 60) + ':' + pad(m % 60);
+const iso = () => new Date().toISOString();
+const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+function niceDay(day) {
+  const d = new Date(day + 'T12:00'), t = dstr(new Date()), y = dstr(new Date(Date.now() - 864e5));
+  const s = WD[d.getDay()] + ' ' + pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.';
+  return day === t ? 'Heute, ' + s : day === y ? 'Gestern, ' + s : s + d.getFullYear();
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2400); }
+const norm = s => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
+
+let PROJ = new Map();
+function indexProjects() { PROJ = new Map((st.auftraege?.projekte || []).map(p => [p.nr, p])); }
+indexProjects();
+const pname = nr => (PROJ.get(nr)?.name) || '';
+// Auswahl = {projekt, auftrag, pos}; leerer Auftrag = "wie üblich" (entscheidet die Auswertung am PC)
+const aufList = nr => [].concat(PROJ.get(nr)?.auftraege || []);
+const hasChoice = nr => { const a = aufList(nr); return a.length > 1 || (a.length === 1 && Object.keys(a[0].pos || {}).length > 1); };
+const posName = (nr, auf, pos) => { const a = aufList(nr).find(x => x.nr === auf); return (a && a.pos && a.pos[pos]) || ''; };
+const selKey = s => s.projekt + '|' + (s.auftrag || '') + '|' + (s.pos || '');
+function selLabel(s) {   // kurz: "-05 · Pos. 2"
+  if (!s.auftrag) return '';
+  const suf = s.auftrag.startsWith(s.projekt) ? s.auftrag.slice(s.projekt.length) : s.auftrag;
+  return suf + (s.pos ? ' · Pos. ' + s.pos : '');
+}
+function selText(s) {    // lang, für Unterzeile
+  if (!s.auftrag) return pname(s.projekt);
+  const a = aufList(s.projekt).find(x => x.nr === s.auftrag);
+  return [a?.bez, s.pos && posName(s.projekt, s.auftrag, s.pos)].filter(Boolean).join(' · ') || pname(s.projekt);
+}
+
+// ------------------------------------------------------------ Zeiten
+const live = () => st.eintraege.filter(e => !e.geloescht);
+function addEntry(tag, von, bis, sel, notiz) {
+  st.eintraege.push({ id: rid(12), tag, von, bis, projekt: sel.projekt, auftrag: sel.auftrag || '', pos: sel.pos || '',
+                      notiz: notiz || '', geaendert: iso(), geloescht: false });
+}
+function remember(sel) {
+  st.genutzt[sel.projekt] = iso();
+  (st.wahl || (st.wahl = {}))[sel.projekt] = { auftrag: sel.auftrag || '', pos: sel.pos || '' };
+}
+function start(sel) {
+  const now = Date.now();
+  if (st.laufend) stopRunning(now, true);
+  st.laufend = { projekt: sel.projekt, auftrag: sel.auftrag || '', pos: sel.pos || '', start: now };
+  remember(sel);
+  save(); render();
+}
+// Projekt wählen, bei mehreren Aufträgen/Positionen danach Auftrag + Position
+const pickFull = cb => pick(nr => chooseAuftrag(nr, cb));
+// laufende Zeit beenden -> Eintrag(e); über Mitternacht wird geteilt
+function stopRunning(end, quiet) {
+  const r = st.laufend; if (!r) return;
+  st.laufend = null;
+  if (end - r.start < 60e3) { if (!quiet) toast('Unter einer Minute – nicht gespeichert'); save(); render(); return; }
+  let a = new Date(r.start);
+  const b = new Date(end);
+  while (dstr(a) !== dstr(b)) {
+    addEntry(dstr(a), hmOf(a), '24:00', r, r.notiz);
+    a = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 1, 0, 0);
+  }
+  if (hmOf(a) !== hmOf(b)) addEntry(dstr(a), hmOf(a), hmOf(b), r, r.notiz);
+  remember(r);
+  save(); render();
+  if (!quiet) toast('Gespeichert: ' + r.projekt);
+}
+
+// ------------------------------------------------------------ Standort
+function getPos() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      p => res({ lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy) }),
+      () => res(null), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+  });
+}
+function dist(a, b) {
+  const R = 6371e3, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const NEAR = 400;   // Meter
+function nearby(pos) {
+  if (!pos) return [];
+  return Object.entries(st.orte).map(([nr, l]) => [nr, Math.min(...l.map(o => dist(o, pos)))])
+    .filter(([, d]) => d <= NEAR + Math.min(pos.acc || 0, 300)).sort((x, y) => x[1] - y[1]);
+}
+async function rememberPlace(nr) {
+  if (!nr) return;
+  toast('Standort wird ermittelt …');
+  const pos = await getPos();
+  if (!pos) return toast('Kein Standort – Zugriff in den iPhone-Einstellungen erlauben');
+  const l = st.orte[nr] || (st.orte[nr] = []);
+  if (l.some(o => dist(o, pos) < 100)) return toast('Dieser Ort ist für ' + nr + ' schon gemerkt');
+  l.push({ lat: +pos.lat.toFixed(6), lon: +pos.lon.toFixed(6), acc: pos.acc, am: iso() });
+  if (l.length > 5) l.shift();
+  save(); toast('Standort für ' + nr + ' gemerkt'); render();
+}
+let lastPos = null, posAt = 0;
+async function checkNearby() {
+  if (!Object.keys(st.orte).length) { $('#suggest').innerHTML = ''; return; }
+  if (Date.now() - posAt > 60e3) { lastPos = await getPos(); posAt = Date.now(); }
+  const near = nearby(lastPos).filter(([nr]) => !st.laufend || st.laufend.projekt !== nr);
+  if (!near.length) { $('#suggest').innerHTML = ''; return; }
+  const [nr, d] = near[0];
+  const sel = { projekt: nr, ...((st.wahl || {})[nr] || {}) };   // wie beim letzten Mal
+  $('#suggest').innerHTML = `<div class="card suggest"><div class="small muted">📍 In der Nähe (${Math.round(d)} m)</div>
+    <div style="margin-top:4px"><span class="nr">${esc(nr)}</span> <span class="small muted">${esc(selLabel(sel))}</span></div><div class="small muted">${esc(selText(sel))}</div>
+    <div class="row"><button class="btn" id="sugGo">${st.laufend ? 'Wechseln' : 'Starten'}</button><button class="btn sec" id="sugOther">Anderer Auftrag</button><button class="btn sec" id="sugNo">Nein</button></div></div>`;
+  $('#sugGo').onclick = () => { $('#suggest').innerHTML = ''; start(sel); };
+  $('#sugOther').onclick = () => { $('#suggest').innerHTML = ''; chooseAuftrag(nr, start, true); };
+  if (!hasChoice(nr)) $('#sugOther').remove();
+  $('#sugNo').onclick = () => { $('#suggest').innerHTML = ''; };
+}
+
+// ------------------------------------------------------------ Anzeige
+let viewDay = dstr(new Date()), tick = null;
+function render() { renderHints(); renderRun(); renderDay(); renderSendBtn(); }
+
+function renderHints() {
+  const h = [];
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (ios && !navigator.standalone) h.push(`<div class="hint"><b>Zum Home-Bildschirm hinzufügen</b>In Safari unten auf <i>Teilen</i> ⬆︎ und „Zum Home-Bildschirm“ tippen. Dann startet die App wie eine normale App und die Daten bleiben dauerhaft gespeichert.</div>`);
+  if (!st.auftraege) h.push(`<div class="hint"><b>Erst die Auftragsliste laden</b>Der ZeitTracker am PC legt sie in OneDrive ab (Ordner <i>ZeitTracker-mobil</i>, Datei <i>auftraege.json</i>).<div class="row"><button class="btn" id="hintLoad">Auftragsliste laden</button></div></div>`);
+  else {
+    const age = (Date.now() - new Date(st.auftraege.stand)) / 864e5;
+    if (!st.auftraege.projekte.some(p => p.auftraege)) h.push(`<div class="hint"><b>Auftragsliste bitte neu laden</b>Die neue Fassung enthält die einzelnen Aufträge und Positionen je Projekt (Menü → Auftragsliste laden).</div>`);
+    else if (age > 21) h.push(`<div class="hint"><b>Auftragsliste ist ${Math.floor(age)} Tage alt</b>Neue Projekte fehlen evtl. – im Menü neu laden.</div>`);
+  }
+  $('#hints').innerHTML = h.join('');
+  const b = $('#hintLoad'); if (b) b.onclick = () => $('#fileIn').click();
+}
+
+function renderRun() {
+  clearInterval(tick);
+  const r = st.laufend, el = $('#run');
+  if (!r) {
+    el.innerHTML = `<div class="muted small">Keine Zeit läuft</div>
+      <div class="row"><button class="btn" id="startBtn">▶︎ Zeit starten</button></div>`;
+    $('#startBtn').onclick = () => pickFull(start);
+    return;
+  }
+  const s = new Date(r.start);
+  el.innerHTML = `<div class="small muted">Läuft</div>
+    <div style="margin-top:2px"><span class="nr" style="font-size:19px">${esc(r.projekt)}</span> <span class="muted">${esc(selLabel(r))}</span></div><div class="name">${esc(selText(r))}</div>
+    ${hasChoice(r.projekt) ? `<button class="link" id="aufBtn" style="padding-top:2px">${r.auftrag ? 'Auftrag ändern' : 'Auftrag wählen (sonst wie üblich)'}</button>` : ''}
+    <div class="clock" id="clock"></div>
+    <div class="since">seit <input type="time" id="since" value="${hmOf(s)}"> ${dstr(s) !== dstr(new Date()) ? '(' + niceDay(dstr(s)) + ')' : ''}</div>
+    <div class="row"><button class="btn red" id="stopBtn">■ Stopp</button><button class="btn sec" id="swBtn">Wechseln</button></div>
+    <button class="link" id="placeBtn">📍 Standort für ${esc(r.projekt)} merken</button>`;
+  const upd = () => { const m = Math.max(0, Math.floor((Date.now() - r.start) / 1000)); $('#clock').textContent = Math.floor(m / 3600) + ':' + pad(Math.floor(m % 3600 / 60)) + ':' + pad(m % 60); };
+  upd(); tick = setInterval(upd, 1000);
+  $('#stopBtn').onclick = () => stopRunning(Date.now());
+  $('#swBtn').onclick = () => pickFull(start);
+  const ab = $('#aufBtn');
+  if (ab) ab.onclick = () => chooseAuftrag(r.projekt, sel => { Object.assign(r, { auftrag: sel.auftrag, pos: sel.pos }); remember(r); save(); renderRun(); }, true);
+  $('#placeBtn').onclick = () => rememberPlace(r.projekt);
+  $('#since').onchange = e => {
+    const v = e.target.value; if (!v) return;
+    const [h, m] = v.split(':').map(Number), d = new Date(r.start); d.setHours(h, m, 0, 0);
+    if (d.getTime() > Date.now()) { toast('Beginn liegt in der Zukunft'); e.target.value = hmOf(s); return; }
+    r.start = d.getTime(); save(); renderRun();
+  };
+}
+
+function renderDay() {
+  const list = live().filter(e => e.tag === viewDay).sort((a, b) => a.von.localeCompare(b.von));
+  const total = list.reduce((a, e) => a + mins(e.bis) - mins(e.von), 0);
+  const isToday = viewDay === dstr(new Date());
+  let h = `<div class="dayhead"><button class="ib" id="prevDay" aria-label="Tag zurück">‹</button><b>${niceDay(viewDay)}</b>
+    <button class="ib" id="nextDay" aria-label="Tag vor" ${isToday ? 'style="visibility:hidden"' : ''}>›</button></div>`;
+  if (!list.length) h += `<div class="empty">Keine Einträge${isToday && st.laufend ? ' (laufende Zeit wird beim Stopp eingetragen)' : ''}</div>`;
+  for (const e of list) {
+    h += `<div class="entry" data-id="${e.id}"><div class="t">${e.von}–${e.bis === '24:00' ? '24:00' : e.bis}</div>
+      <div class="p"><div><span class="nr">${esc(e.projekt)}</span> <span class="small muted">${esc(selLabel(e))}</span></div><div class="small muted">${esc(e.notiz || selText(e))}</div></div>
+      <div class="d">${dur(mins(e.bis) - mins(e.von))}</div></div>`;
+  }
+  if (list.length) h += `<div class="total"><span>Summe</span><span>${dur(total)} h</span></div>`;
+  $('#day').innerHTML = h;
+  $('#prevDay').onclick = () => { const d = new Date(viewDay + 'T12:00'); d.setDate(d.getDate() - 1); viewDay = dstr(d); renderDay(); };
+  $('#nextDay').onclick = () => { const d = new Date(viewDay + 'T12:00'); d.setDate(d.getDate() + 1); viewDay = dstr(d); renderDay(); };
+  $('#day').querySelectorAll('.entry').forEach(el => el.onclick = () => edit(el.dataset.id));
+}
+
+const unsent = () => st.eintraege.filter(e => !st.gesendet || e.geaendert > st.gesendet).length;
+function renderSendBtn() {
+  const n = unsent();
+  $('#sendBtn').innerHTML = 'Senden' + (n ? `<span class="badge">${n}</span>` : '');
+}
+
+// ------------------------------------------------------------ Blätter
+function openSheet(id) { $(id).classList.add('open'); }
+function closeSheet(id) { $(id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeSheet('#' + b.closest('.sheet').id));
+
+// Projekt wählen
+let pickCb = null;
+async function pick(cb) {
+  pickCb = cb; $('#q').value = ''; renderPick(); openSheet('#pickSheet');
+  if (Object.keys(st.orte).length) { if (Date.now() - posAt > 60e3) { lastPos = await getPos(); posAt = Date.now(); } renderPick(); }
+}
+function itemHtml(nr, extra) {
+  const p = PROJ.get(nr);
+  const na = aufList(nr).length;
+  const aufInfo = na > 1 ? na + ' Aufträge' : p?.auftrag && p.auftrag !== nr + '-01' ? p.auftrag : '';
+  return `<div class="item" data-nr="${esc(nr)}"><div><span class="nr">${esc(nr)}</span>${aufInfo ? ` <span class="small muted">${esc(aufInfo)}</span>` : ''}${extra ? ` <span class="small muted">${extra}</span>` : ''}</div>${p?.name ? `<div class="n2">${esc(p.name)}</div>` : ''}</div>`;
+}
+function renderPick() {
+  const q = norm($('#q').value.trim()), words = q.split(/\s+/).filter(Boolean);
+  const all = st.auftraege?.projekte || [];
+  let h = '';
+  if (!words.length) {
+    const near = nearby(lastPos);
+    if (near.length) h += `<div class="grp">📍 In der Nähe</div><div class="list">${near.slice(0, 5).map(([nr, d]) => itemHtml(nr, Math.round(d) + ' m')).join('')}</div>`;
+    // zuletzt: in der App genutzt, dann vom PC als „zuletzt“ markiert
+    const used = Object.entries(st.genutzt).sort((a, b) => b[1].localeCompare(a[1])).map(([nr]) => nr);
+    const rec = [...new Set([...used, ...all.filter(p => p.zuletzt && !p.allgemein).map(p => p.nr)])].slice(0, 25);
+    if (rec.length) h += `<div class="grp">Zuletzt</div><div class="list">${rec.map(nr => itemHtml(nr)).join('')}</div>`;
+    const gen = all.filter(p => p.allgemein);
+    if (gen.length) h += `<div class="grp">Allgemein</div><div class="list">${gen.map(p => itemHtml(p.nr)).join('')}</div>`;
+    if (!all.length) h += `<div class="card small muted">Noch keine Auftragsliste geladen – Projektnummer oben eintippen oder im Menü die Liste laden.</div>`;
+  } else {
+    const hits = all.filter(p => { const s = norm(p.nr + ' ' + p.name + ' ' + p.auftrag); return words.every(w => s.includes(w)); });
+    const raw = $('#q').value.trim();
+    const exact = all.some(p => norm(p.nr) === q);
+    h += `<div class="list">${hits.slice(0, 80).map(p => itemHtml(p.nr)).join('')}</div>`;
+    if (!hits.length) h += `<div class="card small muted">Nichts gefunden.</div>`;
+    // freie Eingabe nur für Projektnummern (z. B. neues Projekt, das noch nicht in der Liste steht)
+    if (!exact && /^\d[\w.-]{2,11}$/.test(raw)) h += `<div class="grp">Nicht in der Liste</div><div class="list"><div class="item" data-nr="${esc(raw)}"><span class="nr">„${esc(raw)}“ verwenden</span></div></div>`;
+  }
+  $('#pickList').innerHTML = h;
+}
+$('#q').addEventListener('input', renderPick);
+$('#pickList').addEventListener('click', e => {
+  const it = e.target.closest('.item[data-nr]'); if (!it) return;
+  closeSheet('#pickSheet'); $('#q').blur();
+  const cb = pickCb; pickCb = null; if (cb) cb(it.dataset.nr);
+});
+
+// Auftrag + Position wählen (nur wenn es eine Wahl gibt; force = auch sonst anzeigen)
+let aufCb = null, aufNr = '';
+function chooseAuftrag(nr, cb, force) {
+  if (!hasChoice(nr) && !force) return cb({ projekt: nr, auftrag: '', pos: '' });
+  aufCb = cb; aufNr = nr;
+  const p = PROJ.get(nr) || {}, last = (st.wahl || {})[nr];
+  const isLast = (a, q) => last && last.auftrag === a && (last.pos || '') === q ? '<span class="tag">zuletzt</span>' : '';
+  const it = (a, q, title, sub) => `<div class="item" data-a="${esc(a)}" data-p="${esc(q)}"><div>${title}${isLast(a, q)}</div>${sub ? `<div class="n2">${esc(sub)}</div>` : ''}</div>`;
+  const usual = p.auftrag ? p.auftrag + (p.pos ? ' · Pos. ' + p.pos : '') : '';
+  let h = `<div class="small muted" style="margin:4px 4px 0">${esc(nr)} · ${esc(p.name || '')}</div>`;
+  h += `<div class="list" style="margin-top:10px">${it('', '', '<b>Wie üblich</b>', usual ? 'wie am PC: ' + usual + (p.pos ? ' – ' + posName(nr, p.auftrag, p.pos) : '') : 'Auftrag/Position legt die Auswertung am PC fest')}</div>`;
+  for (const a of aufList(nr)) {
+    const ps = Object.entries(a.pos || {});
+    h += `<div class="grp">${esc(a.nr)}${a.bez ? ' · ' + esc(a.bez) : ''}</div><div class="list">`;
+    h += ps.length ? ps.map(([k, v]) => it(a.nr, k, `<span class="nr">Pos. ${esc(k)}</span>`, v)).join('') : it(a.nr, '', `<span class="nr">${esc(a.nr)}</span>`, 'Position am PC wählen');
+    h += `</div>`;
+  }
+  $('#aufTitle').textContent = 'Auftrag ' + nr;
+  $('#aufList').innerHTML = h;
+  $('#aufSheet .body').scrollTop = 0;
+  openSheet('#aufSheet');
+}
+$('#aufList').addEventListener('click', e => {
+  const it = e.target.closest('.item[data-a]'); if (!it) return;
+  closeSheet('#aufSheet');
+  const cb = aufCb; aufCb = null;
+  if (cb) cb({ projekt: aufNr, auftrag: it.dataset.a, pos: it.dataset.p });
+});
+
+// Eintrag bearbeiten / nachtragen
+let editing = null;
+function edit(id) {
+  const e = id ? st.eintraege.find(x => x.id === id) : null;
+  const now = new Date(), from = new Date(now.getTime() - 3600e3);
+  editing = { id: e?.id || null, projekt: e?.projekt || '', auftrag: e?.auftrag || '', pos: e?.pos || '' };
+  $('#editTitle').textContent = e ? 'Eintrag' : 'Nachtragen';
+  $('#editDay').value = e?.tag || viewDay;
+  $('#editFrom').value = e?.von || (viewDay === dstr(now) ? hmOf(new Date(Math.floor(from.getTime() / 9e5) * 9e5)) : '08:00');
+  $('#editTo').value = e ? (e.bis === '24:00' ? '23:59' : e.bis) : (viewDay === dstr(now) ? hmOf(new Date(Math.floor(now.getTime() / 9e5) * 9e5)) : '09:00');
+  $('#editNote').value = e?.notiz || '';
+  $('#editErr').textContent = '';
+  $('#editDel').style.display = e ? '' : 'none';
+  showEditProj(); openSheet('#editSheet');
+}
+function showEditProj() {
+  const p = editing.projekt;
+  $('#editProj').textContent = p ? p + (selLabel(editing) ? ' ' + selLabel(editing) : '') + ' · ' + selText(editing) : 'wählen …';
+  $('#editPlace').disabled = !p;
+  $('#editAuf').style.display = p && hasChoice(p) ? '' : 'none';
+  $('#editAuf').textContent = editing.auftrag ? 'Auftrag/Position ändern' : 'Auftrag/Position wählen (sonst wie üblich)';
+}
+$('#editProj').onclick = () => pickFull(sel => { Object.assign(editing, sel); showEditProj(); });
+$('#editAuf').onclick = () => chooseAuftrag(editing.projekt, sel => { Object.assign(editing, sel); showEditProj(); }, true);
+$('#editPlace').onclick = () => rememberPlace(editing.projekt);
+$('#editSave').onclick = () => {
+  const tag = $('#editDay').value, von = $('#editFrom').value, bis0 = $('#editTo').value;
+  const bis = bis0 === '23:59' ? '24:00' : bis0;
+  const err = !editing.projekt ? 'Bitte ein Projekt wählen.' : !tag || !von || !bis0 ? 'Datum, Von und Bis ausfüllen.' : mins(bis) <= mins(von) ? '„Bis“ muss nach „Von“ liegen.' : '';
+  if (err) { $('#editErr').textContent = err; return; }
+  const clash = live().find(x => x.tag === tag && x.id !== editing.id && mins(x.von) < mins(bis) && mins(von) < mins(x.bis));
+  if (clash && !confirm(`Überschneidet sich mit ${clash.von}–${clash.bis} (${clash.projekt}). Trotzdem sichern?`)) return;
+  if (editing.id) {
+    const e = st.eintraege.find(x => x.id === editing.id);
+    Object.assign(e, { tag, von, bis, projekt: editing.projekt, auftrag: editing.auftrag || '', pos: editing.pos || '', notiz: $('#editNote').value.trim(), geaendert: iso() });
+  } else addEntry(tag, von, bis, editing, $('#editNote').value.trim());
+  remember(editing);
+  viewDay = tag; save(); closeSheet('#editSheet'); render(); toast('Gesichert');
+};
+$('#editDel').onclick = () => {
+  if (!confirm('Eintrag löschen?')) return;
+  const e = st.eintraege.find(x => x.id === editing.id);
+  // nicht entfernen, sondern markieren – damit die Löschung beim nächsten Senden auch am PC ankommt
+  Object.assign(e, { geloescht: true, geaendert: iso() });
+  save(); closeSheet('#editSheet'); render(); toast('Gelöscht');
+};
+$('#addBtn').onclick = () => edit(null);
+
+// ------------------------------------------------------------ Auftragsliste laden
+$('#loadList').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse((await f.text()).replace(/^﻿/, ''));
+    if (d.typ !== 'zeittracker-auftraege' || !Array.isArray(d.projekte)) throw new Error('falsche Datei');
+    st.auftraege = d; indexProjects(); save(); render(); renderMenu();
+    toast(d.projekte.length + ' Projekte geladen');
+  } catch (e) { alert('Das ist keine Auftragsliste des ZeitTrackers.\nBitte „auftraege.json“ aus OneDrive › ZeitTracker-mobil wählen.'); }
+};
+
+// ------------------------------------------------------------ Senden (Datei nach OneDrive)
+async function send() {
+  const since = dstr(new Date(Date.now() - 400 * 864e5));
+  const data = { typ: 'zeittracker-mobil', version: 1, geraet: st.geraet, user: st.auftraege?.user || '', erstellt: iso(),
+                 eintraege: st.eintraege.filter(e => e.tag >= since) };
+  const name = 'zeiten-iphone-' + st.geraet + '.json';
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const file = new File([blob], name, { type: 'application/json' });
+  const stamp = iso();
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); }
+    catch (e) { if (e.name === 'AbortError') return; toast('Teilen fehlgeschlagen: ' + e.message); return; }
+  } else {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  st.gesendet = stamp; save(); render(); renderMenu();
+  toast(st.laufend ? 'Gesendet – die laufende Zeit kommt nach dem Stopp mit' : 'Gesendet');
+}
+$('#sendBtn').onclick = send;
+$('#menuSend').onclick = () => { closeSheet('#menuSheet'); send(); };
+
+// ------------------------------------------------------------ Menü
+function fmtStamp(s) { const d = new Date(s); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + hmOf(d); }
+function renderMenu() {
+  $('#listInfo').textContent = st.auftraege ? `${st.auftraege.projekte.length} Projekte · Stand ${fmtStamp(st.auftraege.stand)}` : 'noch nicht geladen';
+  const n = unsent();
+  $('#sendInfo').textContent = (st.gesendet ? 'zuletzt ' + fmtStamp(st.gesendet) : 'noch nie gesendet') + (n ? ` · ${n} neu/geändert` : '');
+  const pl = Object.entries(st.orte).filter(([, l]) => l.length);
+  $('#places').innerHTML = pl.length ? pl.map(([nr, l]) => `<div class="item place"><div><div class="nr">${esc(nr)} <span class="small muted">${l.length} Ort${l.length > 1 ? 'e' : ''}</span></div><div class="n2">${esc(pname(nr))}</div></div><button class="ib" data-del="${esc(nr)}">Löschen</button></div>`).join('')
+    : `<div class="item muted small">Noch keine – auf der Baustelle „Standort merken“ tippen.</div>`;
+  $('#places').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('Gemerkte Orte für ' + b.dataset.del + ' löschen?')) { delete st.orte[b.dataset.del]; save(); renderMenu(); } });
+  $('#devInfo').textContent = 'Gerät ' + st.geraet + ' · Daten nur auf diesem Gerät, bis sie gesendet werden.';
+}
+$('#menuBtn').onclick = () => { renderMenu(); openSheet('#menuSheet'); };
+
+// ------------------------------------------------------------ Start
+render();
+checkNearby();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (viewDay < dstr(new Date()) && !document.querySelector('.sheet.open')) viewDay = dstr(new Date());
+  render(); checkNearby();
+});
+// am PC (vom ZeitTracker ausgeliefert): Auftragsliste direkt holen
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  fetch('auftraege.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+    if (d && d.typ === 'zeittracker-auftraege' && (!st.auftraege || d.stand > st.auftraege.stand)) { st.auftraege = d; indexProjects(); save(); render(); }
+  }).catch(() => {});
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
